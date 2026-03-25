@@ -1,0 +1,54 @@
+INFO:     Started server process [99722]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50328 - "GET /dcf?symbol=0388&market=HK HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [99722]
+INFO:     Started server process [13353]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50346 - "GET /dcf?symbol=0388&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50354 - "GET /dcf?symbol=AAPL&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50355 - "GET /dcf?symbol=GOOGL&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50359 - "GET /dcf?symbol=2330&market=TW HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13353]
+INFO:     Started server process [26344]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50390 - "GET /dcf?symbol=AAPL&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50393 - "GET /dcf?symbol=0388&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50394 - "GET /dcf?symbol=GOOGL&market=US HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26344]
+INFO:     Started server process [29829]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50419 - "GET /dcf?symbol=AAPL&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50422 - "GET /dcf?symbol=0388&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50423 - "GET /dcf?symbol=GOOGL&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50438 - "GET /dcf?symbol=MSFT&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50439 - "GET /dcf?symbol=NVDA&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50440 - "GET /dcf?symbol=AMZN&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50441 - "GET /dcf?symbol=0700&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50442 - "GET /dcf?symbol=9988&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50443 - "GET /dcf?symbol=2330&market=TW HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50444 - "GET /dcf?symbol=META&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50489 - "GET /dcf?symbol=AMZN&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50498 - "GET /dcf?symbol=NVDA&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50505 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50505 - "GET /analyze?symbol=0700&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50506 - "GET /analyze?symbol=0388&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50512 - "GET /analyze?symbol=TSLA&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50512 - "GET /analyze?symbol=GOOGL&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50512 - "GET /analyze?symbol=0700&market=HK HTTP/1.1" 200 OK

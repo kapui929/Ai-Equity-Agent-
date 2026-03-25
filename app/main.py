@@ -9,13 +9,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# 1. API 路由放最前面
 app.include_router(router)
 
-# 2. 首頁
 @app.get("/")
 def home():
     return FileResponse("app/static/index.html")
 
-# 3. 靜態文件放最後
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

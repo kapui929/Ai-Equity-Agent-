@@ -25,7 +25,7 @@ class DCFModel:
             if not fcf or fcf <= 0:
                 return {"error": "No positive FCF"}
             beta = info.get("beta") or 1.0
-            beta = max(0.5, min(beta, 3.0))
+            beta = max(0.5, min(beta, 1.8))
             ke = p["rf"] + beta * p["erp"]
             total_debt = info.get("totalDebt") or 0
             mcap = price * shares
@@ -241,8 +241,15 @@ class DCFModel:
                             hist.append({"year": yr, "fcf": round(val - capex)})
         except: pass
         hist = sorted(hist, key=lambda x: x["year"])
-        if hist and hist[-1]["fcf"] > 0:
-            return hist[-1]["fcf"], hist
+        if hist:
+            pos_fcfs = [h["fcf"] for h in hist if h["fcf"] > 0]
+            if pos_fcfs:
+                latest = hist[-1]["fcf"]
+                import numpy as np
+                median_fcf = float(np.median(pos_fcfs))
+                if latest <= 0 or latest < median_fcf * 0.5:
+                    return round(median_fcf), hist
+                return latest, hist
         fi = info.get("freeCashflow")
         if fi and fi > 0: return fi, [{"year": "TTM", "fcf": fi}]
         ocf = info.get("operatingCashflow") or 0

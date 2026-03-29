@@ -52,3 +52,14 @@ INFO:     127.0.0.1:50506 - "GET /analyze?symbol=0388&market=HK HTTP/1.1" 200 OK
 INFO:     127.0.0.1:50512 - "GET /analyze?symbol=TSLA&market=US HTTP/1.1" 200 OK
 INFO:     127.0.0.1:50512 - "GET /analyze?symbol=GOOGL&market=US HTTP/1.1" 200 OK
 INFO:     127.0.0.1:50512 - "GET /analyze?symbol=0700&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56491 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56491 - "GET /analyze?symbol=AAPL&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56491 - "GET /analyze?symbol=GOOGL&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56491 - "GET /analyze?symbol=TSLA&market=US HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56502 - "GET /analyze?symbol=2330&market=TW HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56504 - "GET /analyze?symbol=0700&market=HK HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56510 - "GET /analyze?symbol=0388&market=HK HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29829]

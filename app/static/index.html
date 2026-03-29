@@ -3,304 +3,263 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Equity Research Agent</title>
+<title>Stock Analyzer Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);min-height:100vh;color:#fff}
-.container{max-width:800px;margin:0 auto;padding:40px 20px}
-h1{text-align:center;font-size:2.5em;margin-bottom:10px;background:linear-gradient(90deg,#00d2ff,#3a7bd5);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.subtitle{text-align:center;color:#888;margin-bottom:40px}
-.search-box{display:flex;gap:10px;margin-bottom:30px}
-input,select{padding:15px;border:1px solid #444;border-radius:10px;background:rgba(255,255,255,0.1);color:#fff;font-size:16px;outline:none}
-input:focus,select:focus{border-color:#3a7bd5}
-input{flex:1}
-select{width:120px}
-.btn{padding:15px 30px;border:none;border-radius:10px;color:#fff;font-size:16px;cursor:pointer;font-weight:bold}
-.btn-blue{background:linear-gradient(90deg,#00d2ff,#3a7bd5)}
-.btn-purple{background:linear-gradient(90deg,#a855f7,#7c3aed)}
-.btn:hover{opacity:0.9}
-.btn:disabled{opacity:0.5;cursor:not-allowed}
-.card{background:rgba(255,255,255,0.05);border:1px solid #333;border-radius:15px;padding:30px;margin-top:20px;display:none}
-.stock-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px;padding-bottom:15px;border-bottom:1px solid #333}
-.stock-name{font-size:1.5em;font-weight:bold}
-.stock-price{font-size:1.8em;color:#00d2ff}
-.scores{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:25px}
-.score-box{background:rgba(255,255,255,0.05);border-radius:10px;padding:20px;text-align:center}
-.score-label{font-size:0.9em;color:#888;margin-bottom:8px}
-.score-value{font-size:2.2em;font-weight:bold}
-.score-good{color:#4CAF50}
-.score-mid{color:#FF9800}
-.score-bad{color:#f44336}
-.breakdown{background:rgba(255,255,255,0.03);border-radius:10px;padding:20px}
-.breakdown h3{margin-bottom:15px;color:#aaa}
-.metric-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
-.metric-name{color:#aaa}
-.metric-value{font-weight:bold}
-.loading{text-align:center;padding:40px;display:none}
-.spinner{border:3px solid #333;border-top:3px solid #3a7bd5;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 15px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.error{background:rgba(244,67,54,0.1);border:1px solid #f44336;border-radius:10px;padding:20px;text-align:center;display:none;color:#f44336}
-.quick-links{display:flex;gap:10px;justify-content:center;margin-bottom:30px;flex-wrap:wrap}
-.quick-btn{padding:8px 16px;background:rgba(255,255,255,0.1);border:1px solid #444;border-radius:20px;color:#ccc;cursor:pointer;font-size:14px}
-.quick-btn:hover{background:rgba(58,123,213,0.3);border-color:#3a7bd5}
-.ai-report{background:rgba(168,85,247,0.1);border:1px solid #a855f7;border-radius:10px;padding:20px;margin-top:20px;display:none;white-space:pre-wrap;line-height:1.6}
-.ai-report h3{color:#a855f7;margin-bottom:10px}
-.ai-btn-row{text-align:center;margin-top:20px}
-.dcf-card{background:rgba(0,210,255,0.08);border:1px solid #00d2ff;border-radius:15px;padding:25px;margin-top:20px;display:none}
-.dcf-title{font-size:1.3em;color:#00d2ff;margin-bottom:5px;text-align:center}
-.dcf-subtitle{color:#888;font-size:0.9em;text-align:center;margin-bottom:20px}
-.dcf-verdict{text-align:center;font-size:1.5em;font-weight:bold;padding:15px;border-radius:10px;margin-bottom:15px}
-.dcf-undervalued{background:rgba(76,175,80,0.15);color:#4CAF50;border:1px solid #4CAF50}
-.dcf-overvalued{background:rgba(244,67,54,0.15);color:#f44336;border:1px solid #f44336}
-.dcf-fair{background:rgba(255,152,0,0.15);color:#FF9800;border:1px solid #FF9800}
-.dcf-prices{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:20px}
-.dcf-box{text-align:center;padding:15px;background:rgba(255,255,255,0.05);border-radius:10px}
-.dcf-box-label{font-size:0.85em;color:#888;margin-bottom:5px}
-.dcf-box-value{font-size:1.8em;font-weight:bold}
-.dcf-bar{display:flex;align-items:center;margin-bottom:8px;gap:10px}
-.dcf-bar-label{width:60px;font-size:0.85em;color:#888}
-.dcf-bar-fill{height:24px;border-radius:5px;background:linear-gradient(90deg,#00d2ff,#3a7bd5);display:flex;align-items:center;padding-left:10px;font-size:0.8em;min-width:40px}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; }
+
+  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 20px; text-align: center; border-bottom: 1px solid #333; }
+  .header h1 { font-size: 24px; color: #00d4ff; }
+  .header p { color: #888; font-size: 13px; margin-top: 4px; }
+
+  .search-box { max-width: 700px; margin: 20px auto; padding: 0 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .search-box select, .search-box input, .search-box button {
+    padding: 12px 16px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #fff; font-size: 15px;
+  }
+  .search-box input { flex: 1; min-width: 150px; }
+  .search-box button { background: linear-gradient(135deg, #00d4ff, #0090ff); color: #000; font-weight: 700; cursor: pointer; border: none; min-width: 100px; }
+  .search-box button:hover { opacity: 0.9; }
+  .search-box button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+
+  .card { background: #12121a; border: 1px solid #222; border-radius: 12px; padding: 20px; margin-bottom: 16px; display: none; }
+  .card.visible { display: block; }
+  .card h2 { color: #00d4ff; font-size: 18px; margin-bottom: 12px; border-bottom: 1px solid #222; padding-bottom: 8px; }
+  
+  .company-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .company-name { font-size: 22px; font-weight: 700; }
+  .company-price { font-size: 28px; font-weight: 700; color: #00d4ff; }
+  .company-sector { color: #888; font-size: 13px; }
+
+  .score-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .score-item { text-align: center; padding: 16px; background: #1a1a2e; border-radius: 10px; }
+  .score-value { font-size: 36px; font-weight: 800; }
+  .score-label { font-size: 12px; color: #888; margin-top: 4px; }
+
+  .green { color: #00e676; }
+  .yellow { color: #ffab00; }
+  .red { color: #ff5252; }
+
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px;}
+  .metric { display: flex; justify-content: space-between; padding: 8px 12px; background: #1a1a2e; border-radius: 6px; font-size: 13px; }
+  .metric .label { color: #888; }
+  .metric .val { font-weight: 600; }
+
+  .chart-container { position: relative; height: 300px; width: 100%; margin-bottom: 20px; }
+  
+  .news-list { list-style: none; }
+  .news-item { background: #1a1a2e; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+  .news-item a { color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; }
+  .news-item a:hover { color: #00d4ff; }
+  .news-publisher { font-size: 11px; color: #888; margin-top: 4px; display: block; }
+
+  .ai-btn-row { text-align: center; margin-top: 20px; }
+  .btn-purple { background: linear-gradient(90deg, #a855f7, #7c3aed); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;}
+  .ai-report { background: rgba(168,85,247,0.1); border: 1px solid #a855f7; border-radius: 10px; padding: 20px; margin-top: 20px; display: none; white-space: pre-wrap; line-height: 1.6; font-size: 14px;}
+  
+  .loading { text-align: center; padding: 40px; display: none; }
+  .error { background: rgba(244,67,54,0.1); border: 1px solid #f44336; border-radius: 10px; padding: 20px; text-align: center; display: none; color: #f44336; margin-bottom: 16px;}
+  .quick-links { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; padding: 10px;}
+  .quick-btn { padding: 6px 12px; background: #1a1a2e; border: 1px solid #333; border-radius: 20px; color: #ccc; cursor: pointer; font-size: 12px; }
+  .quick-btn:hover { background: #2a2a4e; border-color: #00d4ff; }
 </style>
 </head>
 <body>
+
+<div class="header">
+  <h1>AI Equity Research Agent</h1>
+  <p>Comprehensive 6-Dimension Stock Analysis (Macro, Fundamental, Technical & AI)</p>
+</div>
+
+<div class="quick-links">
+    <span class="quick-btn" onclick="quickSearch('AAPL','US')">AAPL</span>
+    <span class="quick-btn" onclick="quickSearch('NVDA','US')">NVDA</span>
+    <span class="quick-btn" onclick="quickSearch('2330','TW')">2330.TW</span>
+    <span class="quick-btn" onclick="quickSearch('0700','HK')">0700.HK</span>
+    <span class="quick-btn" onclick="quickSearch('BTC','CRYPTO')">BTC</span>
+</div>
+
+<div class="search-box">
+  <input type="text" id="symbol" placeholder="Symbol (e.g. AAPL, 2330)">
+  <select id="market">
+    <option value="US">US</option>
+    <option value="TW">TW</option>
+    <option value="HK">HK</option>
+    <option value="CRYPTO">Crypto</option>
+  </select>
+  <button id="analyzeBtn" onclick="analyze()">Analyze</button>
+</div>
+
 <div class="container">
-    <h1>AI Equity Research Agent</h1>
-    <p class="subtitle">Analyze global stocks - US, TW, HK, Crypto</p>
+  <div class="loading" id="loading">Analyzing market data & fundamentals...</div>
+  <div class="error" id="error"></div>
 
-    <div class="quick-links">
-        <span class="quick-btn" onclick="quickSearch('AAPL','US')">AAPL</span>
-        <span class="quick-btn" onclick="quickSearch('GOOGL','US')">GOOGL</span>
-        <span class="quick-btn" onclick="quickSearch('TSLA','US')">TSLA</span>
-        <span class="quick-btn" onclick="quickSearch('2330','TW')">2330.TW</span>
-        <span class="quick-btn" onclick="quickSearch('0700','HK')">0700.HK</span>
-        <span class="quick-btn" onclick="quickSearch('BTC','CRYPTO')">BTC</span>
+  <div class="card" id="resultCard">
+    <div class="company-header">
+      <div>
+        <div class="company-name" id="stockName">--</div>
+        <div class="company-sector" id="stockSector">--</div>
+      </div>
+      <div class="company-price" id="stockPrice">--</div>
     </div>
 
-    <div class="search-box">
-        <input type="text" id="symbol" placeholder="Enter stock symbol (e.g. AAPL, 2330)">
-        <select id="market">
-            <option value="US">US</option>
-            <option value="TW">TW</option>
-            <option value="HK">HK</option>
-            <option value="CRYPTO">Crypto</option>
-        </select>
-        <button class="btn btn-blue" id="analyzeBtn" onclick="analyze()">Analyze</button>
+    <div class="score-row">
+      <div class="score-item">
+        <div class="score-value" id="qualityScore">--</div>
+        <div class="score-label">Quality Score</div>
+      </div>
+      <div class="score-item">
+        <div class="score-value" id="valuationScore">--</div>
+        <div class="score-label">Valuation Score</div>
+      </div>
+      <div class="score-item">
+        <div class="score-value" id="overallScore">--</div>
+        <div class="score-label">Overall Score</div>
+      </div>
     </div>
 
-    <div class="loading" id="loading"><div class="spinner"></div><p>Analyzing...</p></div>
-    <div class="error" id="error"></div>
-
-    <div class="card" id="result">
-        <div class="stock-header">
-            <div>
-                <div class="stock-name" id="stockName"></div>
-                <div style="color:#888" id="stockSector"></div>
-            </div>
-            <div class="stock-price" id="stockPrice"></div>
-        </div>
-        <div class="scores">
-            <div class="score-box"><div class="score-label">Quality Score</div><div class="score-value" id="qualityScore"></div></div>
-            <div class="score-box"><div class="score-label">Valuation Score</div><div class="score-value" id="valuationScore"></div></div>
-            <div class="score-box"><div class="score-label">Overall Score</div><div class="score-value" id="overallScore"></div></div>
-        </div>
-        <div class="breakdown">
-            <h3>Quality Breakdown</h3>
-            <div id="qualityBreakdown"></div>
-            <h3 style="margin-top:20px">Valuation Breakdown</h3>
-            <div id="valuationBreakdown"></div>
-        </div>
-        <div class="ai-btn-row">
-            <button class="btn btn-purple" id="aiBtn" onclick="getAIReport()">Generate AI Report</button>
-        </div>
-        <div class="ai-report" id="aiReport">
-            <h3>AI Analysis Report</h3>
-            <div id="aiContent"></div>
-        </div>
+    <h2>Dimension 6: Technicals (1-Year Trend)</h2>
+    <div class="chart-container">
+      <canvas id="priceChart"></canvas>
     </div>
 
-    <div class="dcf-card" id="dcfCard">
-        <div class="dcf-title">DCF Valuation Model</div>
-        <div class="dcf-subtitle">Discounted Cash Flow Analysis</div>
-        <div class="dcf-verdict" id="dcfVerdict"></div>
-        <div class="dcf-prices">
-            <div class="dcf-box">
-                <div class="dcf-box-label">Current Price</div>
-                <div class="dcf-box-value" id="dcfCurrent" style="color:#00d2ff"></div>
-            </div>
-            <div class="dcf-box">
-                <div class="dcf-box-label">DCF Target Price</div>
-                <div class="dcf-box-value" id="dcfTarget" style="color:#a855f7"></div>
-            </div>
-            <div class="dcf-box">
-                <div class="dcf-box-label">Upside / Downside</div>
-                <div class="dcf-box-value" id="dcfUpside"></div>
-            </div>
-        </div>
-        <div id="dcfProjection"></div>
-        <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:15px;margin-top:15px">
-            <h4 style="color:#888;margin-bottom:10px;font-size:0.9em">Assumptions</h4>
-            <div id="dcfAssumptions"></div>
-        </div>
+    <h2>Dimensions 3 & 4: Fundamentals & Valuation</h2>
+    <div class="metric-grid" id="metricsGrid"></div>
+
+    <h2>Dimensions 1 & 5: Macro & Catalysts (Recent News)</h2>
+    <ul class="news-list" id="newsList"></ul>
+
+    <div class="ai-btn-row">
+      <button class="btn-purple" id="aiBtn" onclick="getAIReport()">Generate AI Report Summary</button>
     </div>
+    <div class="ai-report" id="aiReport"></div>
+  </div>
 </div>
 
 <script>
-let currentSymbol='',currentMarket='';
+let currentSymbol = '', currentMarket = '', priceChartInst = null;
 
-function quickSearch(s,m){
-    document.getElementById('symbol').value=s;
-    document.getElementById('market').value=m;
+function quickSearch(s, m) {
+    document.getElementById('symbol').value = s;
+    document.getElementById('market').value = m;
     analyze();
 }
 
-async function analyze(){
-    const symbol=document.getElementById('symbol').value.trim();
-    const market=document.getElementById('market').value;
-    if(!symbol){alert('Please enter a stock symbol');return;}
-    currentSymbol=symbol;
-    currentMarket=market;
+async function analyze() {
+    const symbol = document.getElementById('symbol').value.trim();
+    const market = document.getElementById('market').value;
+    if (!symbol) return;
 
-    document.getElementById('loading').style.display='block';
-    document.getElementById('result').style.display='none';
-    document.getElementById('error').style.display='none';
-    document.getElementById('aiReport').style.display='none';
-    document.getElementById('dcfCard').style.display='none';
-    document.getElementById('analyzeBtn').disabled=true;
+    currentSymbol = symbol; currentMarket = market;
+    
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('resultCard').classList.remove('visible');
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('aiReport').style.display = 'none';
+    document.getElementById('analyzeBtn').disabled = true;
 
-    try{
-        const res=await fetch('/analyze?symbol='+symbol+'&market='+market);
-        const data=await res.json();
-        console.log('API response:', data);
+    try {
+        const res = await fetch('/analyze?symbol=' + symbol + '&market=' + market);
+        const data = await res.json();
 
-        if(data.error){
-            document.getElementById('error').textContent=data.error;
-            document.getElementById('error').style.display='block';
-            return;
+        if (data.error) throw new Error(data.error);
+
+        document.getElementById('stockName').textContent = data.symbol + ' - ' + data.name;
+        document.getElementById('stockSector').textContent = data.sector;
+        document.getElementById('stockPrice').textContent = data.currency + ' ' + data.price;
+
+        setScore('qualityScore', data.quality.score);
+        setScore('valuationScore', data.valuation.score);
+        setScore('overallScore', data.overall_score);
+
+        const grid = document.getElementById('metricsGrid');
+        grid.innerHTML = '';
+        const allMetrics = {...data.quality.breakdown, ...data.valuation.breakdown};
+        const labels = {roe:'ROE', profit_margin:'Profit Margin', debt_to_equity:'Debt/Equity', revenue_growth:'Rev Growth', pe_ratio:'P/E', pb_ratio:'P/B', dividend_yield:'Div Yield'};
+        for (let key in allMetrics) {
+            grid.innerHTML += `<div class="metric"><span class="label">${labels[key]||key}</span><span class="val">${allMetrics[key].value}</span></div>`;
         }
 
-        document.getElementById('stockName').textContent=data.symbol+' - '+data.name;
-        document.getElementById('stockSector').textContent=data.sector||'';
-        document.getElementById('stockPrice').textContent=(data.currency||'')+' '+(data.price||'N/A');
-
-        setScore('qualityScore',data.quality.score);
-        setScore('valuationScore',data.valuation.score);
-        setScore('overallScore',data.overall_score);
-
-        renderBreakdown('qualityBreakdown',data.quality.breakdown);
-        renderBreakdown('valuationBreakdown',data.valuation.breakdown);
-
-        document.getElementById('result').style.display='block';
-
-        if(data.dcf && !data.dcf.error){
-            renderDCF(data.dcf);
+        const newsList = document.getElementById('newsList');
+        newsList.innerHTML = '';
+        if(data.news && data.news.length > 0) {
+            data.news.forEach(n => {
+                newsList.innerHTML += `<li class="news-item"><a href="${n.link}" target="_blank">${n.title}</a><span class="news-publisher">${n.publisher}</span></li>`;
+            });
+        } else {
+            newsList.innerHTML = '<li class="news-item"><span class="news-publisher">No recent news found.</span></li>';
         }
-    }catch(e){
-        console.error('Error:', e);
-        document.getElementById('error').textContent='Failed: '+e.message;
-        document.getElementById('error').style.display='block';
-    }finally{
-        document.getElementById('loading').style.display='none';
-        document.getElementById('analyzeBtn').disabled=false;
+
+        renderChart(data.chart_data);
+
+        document.getElementById('resultCard').classList.add('visible');
+    } catch (e) {
+        document.getElementById('error').textContent = e.message;
+        document.getElementById('error').style.display = 'block';
+    } finally {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('analyzeBtn').disabled = false;
     }
 }
 
-function renderDCF(dcf){
-    console.log('Rendering DCF:', dcf);
-    document.getElementById('dcfCurrent').textContent='$'+dcf.current_price;
-    document.getElementById('dcfTarget').textContent='$'+dcf.target_price;
+function renderChart(chartData) {
+    if(priceChartInst) priceChartInst.destroy();
+    if(!chartData || !chartData.dates) return;
 
-    var upsideEl=document.getElementById('dcfUpside');
-    upsideEl.textContent=dcf.upside;
-    var num=parseFloat(dcf.upside);
-    upsideEl.style.color=num>0?'#4CAF50':'#f44336';
-
-    var verdictEl=document.getElementById('dcfVerdict');
-    verdictEl.textContent=dcf.verdict;
-    verdictEl.className='dcf-verdict';
-    if(dcf.verdict.indexOf('Undervalued')>=0) verdictEl.classList.add('dcf-undervalued');
-    else if(dcf.verdict.indexOf('Overvalued')>=0) verdictEl.classList.add('dcf-overvalued');
-    else verdictEl.classList.add('dcf-fair');
-
-    var projDiv=document.getElementById('dcfProjection');
-    var html='<h4 style="color:#888;margin-bottom:10px;font-size:0.9em">5-Year FCF Projection</h4>';
-    if(dcf.yearly_projection){
-        var maxFcf=0;
-        for(var i=0;i<dcf.yearly_projection.length;i++){
-            if(dcf.yearly_projection[i].fcf>maxFcf) maxFcf=dcf.yearly_projection[i].fcf;
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    priceChartInst = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.dates,
+            datasets: [{
+                label: 'Close Price',
+                data: chartData.prices,
+                borderColor: '#00d4ff',
+                backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                borderWidth: 2,
+                pointRadius: 0,
+                fill: true,
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false, color: '#333' }, ticks: { color: '#888', maxTicksLimit: 6 } },
+                y: { grid: { color: '#222' }, ticks: { color: '#888' } }
+            },
+            interaction: { intersect: false, mode: 'index' }
         }
-        for(var i=0;i<dcf.yearly_projection.length;i++){
-            var y=dcf.yearly_projection[i];
-            var pct=Math.round(y.fcf/maxFcf*100);
-            var fcfB=(y.fcf/1e9).toFixed(1);
-            html+='<div class="dcf-bar"><span class="dcf-bar-label">Year '+y.year+'</span><div class="dcf-bar-fill" style="width:'+pct+'%">$'+fcfB+'B</div></div>';
-        }
-    }
-    projDiv.innerHTML=html;
-
-    var assDiv=document.getElementById('dcfAssumptions');
-    assDiv.innerHTML='';
-    if(dcf.assumptions){
-        var labels={free_cashflow:'Free Cash Flow',growth_rate:'Growth Rate',discount_rate:'Discount Rate (WACC)',terminal_growth:'Terminal Growth',projection_years:'Projection Years'};
-        var keys=Object.keys(dcf.assumptions);
-        for(var i=0;i<keys.length;i++){
-            var key=keys[i];
-            var val=dcf.assumptions[key];
-            var display=val;
-            if(key==='free_cashflow') display='$'+(val/1e9).toFixed(1)+'B';
-            var row=document.createElement('div');
-            row.className='metric-row';
-            row.innerHTML='<span class="metric-name">'+(labels[key]||key)+'</span><span class="metric-value">'+display+'</span>';
-            assDiv.appendChild(row);
-        }
-    }
-
-    document.getElementById('dcfCard').style.display='block';
+    });
 }
 
-async function getAIReport(){
-    document.getElementById('aiBtn').disabled=true;
-    document.getElementById('aiBtn').textContent='Generating...';
-    try{
-        const res=await fetch('/analyze?symbol='+currentSymbol+'&market='+currentMarket+'&ai_report=true');
-        const data=await res.json();
-        document.getElementById('aiContent').textContent=data.ai_report||'No report generated';
-        document.getElementById('aiReport').style.display='block';
-    }catch(e){
-        document.getElementById('aiContent').textContent='Error: '+e.message;
-        document.getElementById('aiReport').style.display='block';
-    }finally{
-        document.getElementById('aiBtn').disabled=false;
-        document.getElementById('aiBtn').textContent='Generate AI Report';
+function setScore(id, score) {
+    const el = document.getElementById(id);
+    el.textContent = score;
+    el.className = 'score-value ' + (score >= 70 ? 'green' : score >= 40 ? 'yellow' : 'red');
+}
+
+async function getAIReport() {
+    const btn = document.getElementById('aiBtn');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    try {
+        const res = await fetch('/analyze?symbol=' + currentSymbol + '&market=' + currentMarket + '&ai_report=true');
+        const data = await res.json();
+        document.getElementById('aiReport').textContent = data.ai_report || 'Error generating report.';
+        document.getElementById('aiReport').style.display = 'block';
+    } catch (e) {
+        document.getElementById('aiReport').textContent = 'Error: ' + e.message;
+        document.getElementById('aiReport').style.display = 'block';
+    } finally {
+        btn.disabled = false; btn.textContent = 'Generate AI Report Summary';
     }
 }
 
-function setScore(id,score){
-    var el=document.getElementById(id);
-    el.textContent=score;
-    el.className='score-value ';
-    if(score>=60) el.className+='score-good';
-    else if(score>=40) el.className+='score-mid';
-    else el.className+='score-bad';
-}
-
-function renderBreakdown(id,breakdown){
-    var c=document.getElementById(id);
-    c.innerHTML='';
-    var labels={roe:'ROE',profit_margin:'Profit Margin',debt_to_equity:'Debt to Equity',revenue_growth:'Revenue Growth',pe_ratio:'P/E Ratio',pb_ratio:'P/B Ratio',dividend_yield:'Dividend Yield'};
-    var keys=Object.keys(breakdown);
-    for(var i=0;i<keys.length;i++){
-        var key=keys[i];
-        var val=breakdown[key];
-        var row=document.createElement('div');
-        row.className='metric-row';
-        row.innerHTML='<span class="metric-name">'+(labels[key]||key)+'</span><span class="metric-value">'+val.value+' (Score: '+val.score+')</span>';
-        c.appendChild(row);
-    }
-}
-
-document.getElementById('symbol').addEventListener('keypress',function(e){
-    if(e.key==='Enter') analyze();
-});
+document.getElementById('symbol').addEventListener('keypress', e => { if(e.key === 'Enter') analyze(); });
 </script>
 </body>
 </html>

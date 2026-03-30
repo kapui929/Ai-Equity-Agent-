@@ -103,7 +103,6 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
         elif market == "CRYPTO": ticker_symbol = f"{symbol}-USD"
         else: ticker_symbol = symbol.upper()
 
-        # 🔥 專業反爬蟲破解：快取 + 重試機制 + 隨機面具
         session = requests_cache.CachedSession('yfinance.cache', expire_after=3600)
         retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504])
         adapter = HTTPAdapter(max_retries=retry)
@@ -121,7 +120,7 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
         info = tk.info
 
         if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):
-            return {"error": f"Yahoo Finance limit hit. We are re-routing your request, please try again in 5 seconds. (Symbol: {ticker_symbol})"}
+            return {"error": f"Yahoo Finance limit hit. Please try again. (Symbol: {ticker_symbol})"}
 
         price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
         currency = info.get("currency") or "USD"
@@ -182,35 +181,13 @@ def generate_ai_report(info, quality, valuation, overall):
     name = info.get("shortName") or "Unknown"
     sector = info.get("sector") or "Unknown"
     price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
-    report = f"""
-{'='*50}
-AI EQUITY RESEARCH REPORT
-{'='*50}
-Company: {name}
-Sector: {sector}
-Current Price: ${price}
-
-QUALITY ANALYSIS (Score: {quality['score']}/100)
-{'─'*40}
-"""
-    for k, v in quality["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})
-"
-    report += f"
-VALUATION ANALYSIS (Score: {valuation['score']}/100)
-{'─'*40}
-"
-    for k, v in valuation["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})
-"
-    report += f"
-OVERALL SCORE: {overall}/100
-{'─'*40}
-"
-    if overall >= 75: report += "RECOMMENDATION: STRONG BUY - Excellent quality and valuation.
-"
-    elif overall >= 60: report += "RECOMMENDATION: BUY - Good fundamentals with reasonable valuation.
-"
-    elif overall >= 45: report += "RECOMMENDATION: HOLD - Mixed signals, monitor closely.
-"
-    else: report += "RECOMMENDATION: SELL - Weak fundamentals or expensive valuation.
-"
+    report = "=" * 50 + "\\nAI EQUITY RESEARCH REPORT\\n" + "=" * 50 + f"\\nCompany: {name}\\nSector: {sector}\\nCurrent Price: ${price}\\n\\nQUALITY ANALYSIS (Score: {quality['score']}/100)\\n" + "─" * 40 + "\\n"
+    for k, v in quality["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})\\n"
+    report += f"\\nVALUATION ANALYSIS (Score: {valuation['score']}/100)\\n" + "─" * 40 + "\\n"
+    for k, v in valuation["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})\\n"
+    report += f"\\nOVERALL SCORE: {overall}/100\\n" + "─" * 40 + "\\n"
+    if overall >= 75: report += "RECOMMENDATION: STRONG BUY - Excellent quality and valuation.\\n"
+    elif overall >= 60: report += "RECOMMENDATION: BUY - Good fundamentals with reasonable valuation.\\n"
+    elif overall >= 45: report += "RECOMMENDATION: HOLD - Mixed signals, monitor closely.\\n"
+    else: report += "RECOMMENDATION: SELL - Weak fundamentals or expensive valuation.\\n"
     return report

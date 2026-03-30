@@ -100,13 +100,8 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
         elif market == "CRYPTO": ticker_symbol = f"{symbol}-USD"
         else: ticker_symbol = symbol.upper()
 
-        # 🔥 加入偽裝面具 (User-Agent) 繞過 Yahoo 封鎖
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        })
-        
-        tk = yf.Ticker(ticker_symbol, session=session)
+       # 直接让 yfinance 内部处理反爬虫
+        tk = yf.Ticker(ticker_symbol)
         info = tk.info
 
         if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):

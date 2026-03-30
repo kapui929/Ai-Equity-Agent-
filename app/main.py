@@ -2,10 +2,6 @@ from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import yfinance as yf
-import requests_cache
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-import random
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -103,24 +99,12 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
         elif market == "CRYPTO": ticker_symbol = f"{symbol}-USD"
         else: ticker_symbol = symbol.upper()
 
-        session = requests_cache.CachedSession('yfinance.cache', expire_after=3600)
-        retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504])
-        adapter = HTTPAdapter(max_retries=retry)
-        session.mount('http://', adapter)
-        session.mount('https://', adapter)
-        
-        user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0'
-        ]
-        session.headers.update({'User-Agent': random.choice(user_agents)})
-        
-        tk = yf.Ticker(ticker_symbol, session=session)
+        # 🚀 聽系統的話：拿掉自定義 Session，放手讓 yfinance 使用它內建的最強繞過機制！
+        tk = yf.Ticker(ticker_symbol)
         info = tk.info
 
         if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):
-            return {"error": f"Yahoo Finance limit hit. Please try again. (Symbol: {ticker_symbol})"}
+            return {"error": f"Cannot fetch data for {ticker_symbol}. Please try again later."}
 
         price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
         currency = info.get("currency") or "USD"
@@ -173,21 +157,19 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
 
         return result
     except Exception as e:
-        if "429" in str(e) or "Too Many Requests" in str(e):
-            return {"error": "Too Many Requests. Yahoo Finance rate limit hit. We are rotating IPs, please click Analyze again."}
         return {"error": str(e)}
 
 def generate_ai_report(info, quality, valuation, overall):
     name = info.get("shortName") or "Unknown"
     sector = info.get("sector") or "Unknown"
     price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
-    report = "=" * 50 + "\\nAI EQUITY RESEARCH REPORT\\n" + "=" * 50 + f"\\nCompany: {name}\\nSector: {sector}\\nCurrent Price: ${price}\\n\\nQUALITY ANALYSIS (Score: {quality['score']}/100)\\n" + "─" * 40 + "\\n"
-    for k, v in quality["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})\\n"
-    report += f"\\nVALUATION ANALYSIS (Score: {valuation['score']}/100)\\n" + "─" * 40 + "\\n"
-    for k, v in valuation["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})\\n"
-    report += f"\\nOVERALL SCORE: {overall}/100\\n" + "─" * 40 + "\\n"
-    if overall >= 75: report += "RECOMMENDATION: STRONG BUY - Excellent quality and valuation.\\n"
-    elif overall >= 60: report += "RECOMMENDATION: BUY - Good fundamentals with reasonable valuation.\\n"
-    elif overall >= 45: report += "RECOMMENDATION: HOLD - Mixed signals, monitor closely.\\n"
-    else: report += "RECOMMENDATION: SELL - Weak fundamentals or expensive valuation.\\n"
+    report = "=" * 50 + "\nAI EQUITY RESEARCH REPORT\n" + "=" * 50 + f"\nCompany: {name}\nSector: {sector}\nCurrent Price: ${price}\n\nQUALITY ANALYSIS (Score: {quality['score']}/100)\n" + "─" * 40 + "\n"
+    for k, v in quality["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})\n"
+    report += f"\nVALUATION ANALYSIS (Score: {valuation['score']}/100)\n" + "─" * 40 + "\n"
+    for k, v in valuation["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})\n"
+    report += f"\nOVERALL SCORE: {overall}/100\n" + "─" * 40 + "\n"
+    if overall >= 75: report += "RECOMMENDATION: STRONG BUY - Excellent quality and valuation.\n"
+    elif overall >= 60: report += "RECOMMENDATION: BUY - Good fundamentals with reasonable valuation.\n"
+    elif overall >= 45: report += "RECOMMENDATION: HOLD - Mixed signals, monitor closely.\n"
+    else: report += "RECOMMENDATION: SELL - Weak fundamentals or expensive valuation.\n"
     return report

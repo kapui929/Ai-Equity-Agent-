@@ -2,8 +2,6 @@ from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import yfinance as yf
-import random
-from datetime import datetime, timedelta
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -11,38 +9,6 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 @app.get("/")
 def index():
     return FileResponse("app/static/index.html")
-
-def get_demo_data(symbol):
-    # 如果被 Yahoo 封鎖，自動生成逼真的展示資料，確保面試官能看到 UI
-    base_price = {"AAPL": 175.5, "NVDA": 130.2, "2330.TW": 850.0, "0700.HK": 310.5, "BTC-USD": 65000.0}.get(symbol, 150.0)
-    
-    dates, prices = [], []
-    curr_price = base_price * 0.7
-    for i in range(12):
-        d = (datetime.now() - timedelta(days=365) + timedelta(days=i*30)).strftime('%Y-%m-%d')
-        curr_price = curr_price * (1 + random.uniform(-0.05, 0.12))
-        dates.append(d)
-        prices.append(round(curr_price, 2))
-        
-    quality = {"score": 85, "breakdown": {"roe": {"value": 25.5, "score": 20}, "profit_margin": {"value": 18.2, "score": 20}, "debt_to_equity": {"value": 45.1, "score": 25}, "revenue_growth": {"value": 12.5, "score": 20}}}
-    valuation = {"score": 60, "breakdown": {"pe_ratio": {"value": 24.5, "score": 20}, "pb_ratio": {"value": 5.2, "score": 15}, "dividend_yield": {"value": 1.2, "score": 25}}}
-    
-    return {
-        "symbol": symbol,
-        "name": f"{symbol} (Demo Mode - Live API Rate Limited)",
-        "sector": "Technology",
-        "price": round(prices[-1], 2),
-        "currency": "USD" if "HK" not in symbol and "TW" not in symbol else ("HKD" if "HK" in symbol else "TWD"),
-        "quality": quality,
-        "valuation": valuation,
-        "overall_score": 75,
-        "chart_data": {"dates": dates, "prices": prices},
-        "news": [
-            {"title": f"{symbol} announces new strategic AI initiatives for 2026", "link": "#", "publisher": "Finance Weekly"},
-            {"title": "Global markets react to recent tech earnings reports", "link": "#", "publisher": "Market Watch"},
-            {"title": "Analysts upgrade price targets amidst strong sector growth", "link": "#", "publisher": "Investment Daily"}
-        ]
-    }
 
 def score_quality(info):
     breakdown, total = {}, 0
@@ -123,24 +89,40 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
 
     try:
         tk = yf.Ticker(ticker_symbol)
-        info = tk.info
-
-        if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):
-            raise Exception("Rate Limit Hit")
-
-        price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
-        currency = info.get("currency") or "USD"
-        currency_map = {"HKD": "HKD", "TWD": "TWD", "USD": "USD"}
-        display_currency = currency_map.get(currency, currency)
-
-        quality = score_quality(info)
-        valuation = score_valuation(info)
-        overall = round(quality["score"] * 0.55 + valuation["score"] * 0.45)
-
+        
+        # 🔥 第一步：優先抓取歷史股價圖表 (這個 API 幾乎不會被封鎖，保證能拿到真實股價)
         hist = tk.history(period="1y")
+        if hist.empty:
+            return {"error": f"Cannot find any data for {ticker_symbol}"}
+            
         chart_dates = [d.strftime('%Y-%m-%d') for d in hist.index]
         chart_prices = [round(p, 2) for p in hist['Close']]
+        real_price = chart_prices[-1] # 最新真實股價
 
+        currency_map = {"HK": "HKD", "TW": "TWD", "US": "USD", "CRYPTO": "USD"}
+        display_currency = currency_map.get(market, "USD")
+
+        # 🔥 第二步：嘗試抓取財報數據 (如果被封鎖就跳到 except)
+        try:
+            info = tk.info
+            if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):
+                raise Exception("Rate Limited")
+                
+            quality = score_quality(info)
+            valuation = score_valuation(info)
+            overall = round(quality["score"] * 0.55 + valuation["score"] * 0.45)
+            name = info.get("shortName") or info.get("longName") or ticker_symbol
+            sector = info.get("sector") or "N/A"
+            
+        except Exception:
+            # 🛡️ 半真實模式 (Semi-Live Mode)：財報被封，但價格跟圖表都是 100% 準確的！
+            quality = {"score": "-", "breakdown": {"roe": {"value": "Rate Limited", "score": 0}, "profit_margin": {"value": "Rate Limited", "score": 0}, "debt_to_equity": {"value": "Rate Limited", "score": 0}, "revenue_growth": {"value": "Rate Limited", "score": 0}}}
+            valuation = {"score": "-", "breakdown": {"pe_ratio": {"value": "Rate Limited", "score": 0}, "pb_ratio": {"value": "Rate Limited", "score": 0}, "dividend_yield": {"value": "Rate Limited", "score": 0}}}
+            overall = "-"
+            name = f"{ticker_symbol} (Live Chart, API Limited)"
+            sector = "N/A"
+
+        # 抓取新聞
         raw_news = tk.news
         news_list = []
         if raw_news:
@@ -160,9 +142,9 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
 
         result = {
             "symbol": ticker_symbol,
-            "name": info.get("shortName") or info.get("longName") or ticker_symbol,
-            "sector": info.get("sector") or "N/A",
-            "price": price,
+            "name": name,
+            "sector": sector,
+            "price": real_price,
             "currency": display_currency,
             "quality": quality,
             "valuation": valuation,
@@ -171,22 +153,20 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
             "news": news_list
         }
         
-        if ai_report: result["ai_report"] = generate_ai_report(result["name"], result["sector"], price, quality, valuation, overall)
+        if ai_report: result["ai_report"] = generate_ai_report(result["name"], result["sector"], real_price, quality, valuation, overall)
         return result
 
     except Exception as e:
-        # 🔥 如果遇到 Yahoo 封鎖，啟動優雅降級 (Demo Mode)，確保履歷作品集永遠可用！
-        fallback = get_demo_data(ticker_symbol)
-        if ai_report: fallback["ai_report"] = generate_ai_report(fallback["name"], fallback["sector"], fallback["price"], fallback["quality"], fallback["valuation"], fallback["overall_score"])
-        return fallback
+        return {"error": str(e)}
 
 def generate_ai_report(name, sector, price, quality, valuation, overall):
-    report = "=" * 50 + "\nAI EQUITY RESEARCH REPORT\n" + "=" * 50 + f"\nCompany: {name}\nSector: {sector}\nCurrent Price: ${price}\n\nQUALITY ANALYSIS (Score: {quality['score']}/100)\n" + "─" * 40 + "\n"
-    for k, v in quality["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})\n"
-    report += f"\nVALUATION ANALYSIS (Score: {valuation['score']}/100)\n" + "─" * 40 + "\n"
-    for k, v in valuation["breakdown"].items(): report += f"  {k.upper()}: {v['value']} (Score: {v['score']})\n"
+    report = "=" * 50 + "\nAI EQUITY RESEARCH REPORT\n" + "=" * 50 + f"\nCompany: {name}\nSector: {sector}\nCurrent Price: ${price}\n\nQUALITY ANALYSIS\n" + "─" * 40 + "\n"
+    for k, v in quality["breakdown"].items(): report += f"  {k.upper()}: {v['value']}\n"
+    report += f"\nVALUATION ANALYSIS\n" + "─" * 40 + "\n"
+    for k, v in valuation["breakdown"].items(): report += f"  {k.upper()}: {v['value']}\n"
     report += f"\nOVERALL SCORE: {overall}/100\n" + "─" * 40 + "\n"
-    if overall >= 75: report += "RECOMMENDATION: STRONG BUY - Excellent quality and valuation.\n"
+    if overall == "-": report += "RECOMMENDATION: HOLD - Insufficient fundamental data due to rate limits.\n"
+    elif overall >= 75: report += "RECOMMENDATION: STRONG BUY - Excellent quality and valuation.\n"
     elif overall >= 60: report += "RECOMMENDATION: BUY - Good fundamentals with reasonable valuation.\n"
     elif overall >= 45: report += "RECOMMENDATION: HOLD - Mixed signals, monitor closely.\n"
     else: report += "RECOMMENDATION: SELL - Weak fundamentals or expensive valuation.\n"

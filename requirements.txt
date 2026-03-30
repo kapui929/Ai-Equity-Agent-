@@ -3,3 +3,4 @@ uvicorn
 yfinance
 python-dotenv
 openai
+requests-cache

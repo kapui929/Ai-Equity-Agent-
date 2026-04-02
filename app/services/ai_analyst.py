@@ -1,5 +1,5 @@
 import os
-import google.generativeai as genai
+from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
 # 載入 .env 檔案中的環境變數
@@ -7,22 +7,23 @@ load_dotenv()
 
 class AIAnalyst:
     def __init__(self):
-        # 1. 密鑰管理：從環境變數讀取，確保安全
-        api_key = os.getenv("GEMINI_API_KEY")
+        # 1. 密鑰管理：從環境變數讀取 (絕對不要寫死在程式碼裡)
+        # ⚠️ 請記得在 .env 和 Render 的環境變數中設定 NVIDIA_API_KEY
+        api_key = os.getenv("NVIDIA_API_KEY")
         if not api_key:
-            raise ValueError("在 .env 檔案中找不到 GEMINI_API_KEY，請確認是否設定正確。")
+            raise ValueError("在 .env 檔案中找不到 NVIDIA_API_KEY，請確認是否設定正確。")
         
-        genai.configure(api_key=api_key)
-        
-        # 2. 模型設定：使用 Gemini 1.5 Pro，並強制輸出 JSON 格式 (這對 Fintech 應用極度重要)
-        self.model = genai.GenerativeModel('gemini-pro')
+        # 2. 初始化 OpenAI 相容的非同步客戶端，並指向 NVIDIA 的伺服器
+        self.client = AsyncOpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=api_key
+        )
+        self.model_name = "z-ai/glm4.7"
 
     async def generate_report(self, ticker_data, news_summary):
         """
-        實施 Harness Engineering (決策流水線)：將分析拆解為五個專業階段
+        實施 Harness Engineering (決策流水線)
         """
-        
-        # 確保傳入的數據有預設值，避免 KeyError
         symbol = ticker_data.get('symbol', 'Unknown')
         roe = ticker_data.get('roe', 'N/A')
         pe = ticker_data.get('pe', 'N/A')
@@ -40,7 +41,7 @@ class AIAnalyst:
         - Recent News Summary: {news_summary}
 
         # Task: Execute the Decision Pipeline (Harness Engineering)
-        請嚴格按照以下五個階段進行分析。因為這是一個 API 服務，請你**務必僅輸出 JSON 格式**，確保我的前端系統可以正確解析。
+        請嚴格按照以下五個階段進行分析。因為這是一個 API 服務，請你**務必僅輸出 JSON 格式**，確保我的前端系統可以正確解析。不要輸出任何 Markdown 標記，直接給 JSON。
 
         請輸出以下 JSON 結構：
         {{
@@ -57,9 +58,23 @@ class AIAnalyst:
         """
         
         try:
-            # 呼叫 Gemini 進行推理
-            response = self.model.generate_content(prompt)
-            return response.text
+            # 呼叫 NVIDIA API 進行推理 (取消 Stream，一次性獲取完整 JSON)
+            response = await self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2, # 降低溫度以確保 JSON 格式穩定
+                max_tokens=4096
+            )
+            
+            raw_content = response.choices[0].message.content
+            
+            # 清理有時候大模型會自作聰明加上的 Markdown JSON 標籤
+            if raw_content.startswith("```json"):
+                raw_content = raw_content.replace("```json", "", 1).replace("```", "").strip()
+            elif raw_content.startswith("```"):
+                raw_content = raw_content.replace("```", "").strip()
+                
+            return raw_content
+            
         except Exception as e:
-            # 錯誤處理機制，防止系統崩潰
-            return f'{{"error": "AI 推理過程中發生錯誤: {str(e)}"}}'
+            return f'{{"error": "NVIDIA API 推理過程中發生錯誤: {str(e)}"}}'

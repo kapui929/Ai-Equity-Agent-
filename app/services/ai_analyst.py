@@ -15,7 +15,7 @@ class AIAnalyst:
         genai.configure(api_key=api_key)
         
         # 2. 模型設定：使用 Gemini 1.5 Pro，並強制輸出 JSON 格式 (這對 Fintech 應用極度重要)
-     self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-pro')
 
     async def generate_report(self, ticker_data, news_summary):
         """

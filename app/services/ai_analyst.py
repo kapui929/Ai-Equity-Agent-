@@ -16,7 +16,7 @@ class AIAnalyst:
         
         # 2. 模型設定：使用 Gemini 1.5 Pro，並強制輸出 JSON 格式 (這對 Fintech 應用極度重要)
         self.model = genai.GenerativeModel(
-            model_name='gemini-1.5-pro-flash',
+            model_name='gemini-1.5-flash',
             generation_config={"response_mime_type": "application/json"}
         )
 

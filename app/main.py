@@ -2,14 +2,24 @@ from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import yfinance as yf
+import json
+
+# 🔥 1. 導入我們剛寫好的真 AI 大腦
+from app.services.ai_analyst import AIAnalyst
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# 🔥 2. 初始化 AI 分析師
+analyst = AIAnalyst()
 
 @app.get("/")
 def index():
     return FileResponse("app/static/index.html")
 
+# ==========================================
+# 保留你的打分邏輯 (這部分負責驅動前端的 UI 面板)
+# ==========================================
 def score_quality(info):
     breakdown, total = {}, 0
     roe = info.get("returnOnEquity")
@@ -80,8 +90,9 @@ def score_valuation(info):
 
     return {"score": min(total, 100), "breakdown": breakdown}
 
+# 🔥 3. 注意這裡加上了 async，因為呼叫 LLM 是一個需要等待的 I/O 動作
 @app.get("/analyze")
-def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool = Query(False)):
+async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool = Query(False)):
     if market == "TW": ticker_symbol = f"{symbol}.TW"
     elif market == "HK": ticker_symbol = f"{symbol.zfill(4)}.HK"
     elif market == "CRYPTO": ticker_symbol = f"{symbol}-USD"
@@ -90,7 +101,7 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
     try:
         tk = yf.Ticker(ticker_symbol)
         
-        # 🔥 第一步：優先抓取歷史股價圖表 (這部分通常不會被擋，保證拿到 100% 真實股價)
+        # 抓取圖表數據
         hist = tk.history(period="1y")
         if hist.empty:
             return {"error": f"Cannot find any data for {ticker_symbol}"}
@@ -102,7 +113,7 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
         currency_map = {"HK": "HKD", "TW": "TWD", "US": "USD", "CRYPTO": "USD"}
         display_currency = currency_map.get(market, "USD")
 
-        # 🔥 第二步：嘗試抓取財報數據 (這部分最容易觸發 "String did not match..." 錯誤)
+        # 抓取基本面數據
         try:
             info = tk.info
             if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):
@@ -115,15 +126,17 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
             sector = info.get("sector") or "N/A"
             
         except Exception:
-            # 🛡️ 無敵半真實模式：只要報任何錯，就退回這個模式，保證面試官看到圖表！
             quality = {"score": "-", "breakdown": {"roe": {"value": "Rate Limited", "score": 0}, "profit_margin": {"value": "Rate Limited", "score": 0}, "debt_to_equity": {"value": "Rate Limited", "score": 0}, "revenue_growth": {"value": "Rate Limited", "score": 0}}}
             valuation = {"score": "-", "breakdown": {"pe_ratio": {"value": "Rate Limited", "score": 0}, "pb_ratio": {"value": "Rate Limited", "score": 0}, "dividend_yield": {"value": "Rate Limited", "score": 0}}}
             overall = "-"
             name = f"{ticker_symbol} (Live Chart, API Limited)"
             sector = "N/A"
+            info = {} # 確保 info 存在以防報錯
 
+        # 抓取新聞
         raw_news = tk.news
         news_list = []
+        news_summary = "暫無新聞"
         if raw_news:
             for n in raw_news:
                 if "content" in n: 
@@ -138,6 +151,10 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
                 
                 if title and link: news_list.append({"title": title, "link": link, "publisher": publisher})
                 if len(news_list) >= 3: break
+            
+            # 將前三條新聞標題組合成字串，餵給 AI
+            if news_list:
+                news_summary = " | ".join([n["title"] for n in news_list])
 
         result = {
             "symbol": ticker_symbol,
@@ -152,21 +169,26 @@ def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool
             "news": news_list
         }
         
-        if ai_report: result["ai_report"] = generate_ai_report(result["name"], result["sector"], real_price, quality, valuation, overall)
+        # 🔥 4. 真實 AI 介入點 (Harness Engineering 執行)
+        if ai_report: 
+            # 準備餵給 AI 的乾淨數據
+            ticker_data = {
+                "symbol": ticker_symbol,
+                "roe": quality["breakdown"]["roe"]["value"],
+                "pe": valuation["breakdown"]["pe_ratio"]["value"],
+                "debt_to_equity": quality["breakdown"]["debt_to_equity"]["value"]
+            }
+            
+            # 呼叫 Gemini
+            raw_ai_response = await analyst.generate_report(ticker_data, news_summary)
+            
+            # 將 Gemini 吐出來的 JSON 字串轉換為 Python 字典
+            try:
+                result["ai_report"] = json.loads(raw_ai_response)
+            except json.JSONDecodeError:
+                result["ai_report"] = {"error": "AI 返回格式解析失敗", "raw_output": raw_ai_response}
+
         return result
 
     except Exception as e:
         return {"error": f"API Blocked by Yahoo Finance: {str(e)}"}
-
-def generate_ai_report(name, sector, price, quality, valuation, overall):
-    report = "=" * 50 + "\nAI EQUITY RESEARCH REPORT\n" + "=" * 50 + f"\nCompany: {name}\nSector: {sector}\nCurrent Price: ${price}\n\nQUALITY ANALYSIS\n" + "─" * 40 + "\n"
-    for k, v in quality["breakdown"].items(): report += f"  {k.upper()}: {v['value']}\n"
-    report += f"\nVALUATION ANALYSIS\n" + "─" * 40 + "\n"
-    for k, v in valuation["breakdown"].items(): report += f"  {k.upper()}: {v['value']}\n"
-    report += f"\nOVERALL SCORE: {overall}/100\n" + "─" * 40 + "\n"
-    if overall == "-": report += "RECOMMENDATION: HOLD - Insufficient fundamental data due to rate limits.\n"
-    elif overall >= 75: report += "RECOMMENDATION: STRONG BUY - Excellent quality and valuation.\n"
-    elif overall >= 60: report += "RECOMMENDATION: BUY - Good fundamentals with reasonable valuation.\n"
-    elif overall >= 45: report += "RECOMMENDATION: HOLD - Mixed signals, monitor closely.\n"
-    else: report += "RECOMMENDATION: SELL - Weak fundamentals or expensive valuation.\n"
-    return report

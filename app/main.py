@@ -6,6 +6,13 @@ import json
 
 # 🔥 1. 導入我們剛寫好的真 AI 大腦
 from app.services.ai_analyst import AIAnalyst
+from app.services.dcf_model import DCFModel # 👈 新增這個
+
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+analyst = AIAnalyst()
+dcf_engine = DCFModel() # 👈 初始化 DCF 模型
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -116,22 +123,17 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
         # 抓取基本面數據
         try:
             info = tk.info
-            if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):
-                raise Exception("Rate Limited")
-                
             quality = score_quality(info)
             valuation = score_valuation(info)
             overall = round(quality["score"] * 0.55 + valuation["score"] * 0.45)
             name = info.get("shortName") or info.get("longName") or ticker_symbol
             sector = info.get("sector") or "N/A"
-            
         except Exception:
-            quality = {"score": "-", "breakdown": {"roe": {"value": "Rate Limited", "score": 0}, "profit_margin": {"value": "Rate Limited", "score": 0}, "debt_to_equity": {"value": "Rate Limited", "score": 0}, "revenue_growth": {"value": "Rate Limited", "score": 0}}}
-            valuation = {"score": "-", "breakdown": {"pe_ratio": {"value": "Rate Limited", "score": 0}, "pb_ratio": {"value": "Rate Limited", "score": 0}, "dividend_yield": {"value": "Rate Limited", "score": 0}}}
+            quality = {"score": "-", "breakdown": {"roe": {"value": "Rate Limited", "score": 0}}}
+            valuation = {"score": "-", "breakdown": {"pe_ratio": {"value": "Rate Limited", "score": 0}}}
             overall = "-"
             name = f"{ticker_symbol} (Live Chart, API Limited)"
             sector = "N/A"
-            info = {} # 確保 info 存在以防報錯
 
         # 抓取新聞
         raw_news = tk.news
@@ -139,20 +141,12 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
         news_summary = "暫無新聞"
         if raw_news:
             for n in raw_news:
-                if "content" in n: 
-                    title = n["content"].get("title", "")
-                    link_obj = n["content"].get("clickThroughUrl", {}) or n["content"].get("canonicalUrl", {})
-                    link = link_obj.get("url", "") if isinstance(link_obj, dict) else ""
-                    publisher = n["content"].get("provider", {}).get("displayName", "")
-                else:
-                    title = n.get("title", "")
-                    link = n.get("link", "")
-                    publisher = n.get("publisher", "")
-                
+                title = n.get("content", {}).get("title", "") or n.get("title", "")
+                link_obj = n.get("content", {}).get("clickThroughUrl", {}) or n.get("link", "")
+                link = link_obj.get("url", "") if isinstance(link_obj, dict) else link_obj
+                publisher = n.get("content", {}).get("provider", {}).get("displayName", "") or n.get("publisher", "")
                 if title and link: news_list.append({"title": title, "link": link, "publisher": publisher})
                 if len(news_list) >= 3: break
-            
-            # 將前三條新聞標題組合成字串，餵給 AI
             if news_list:
                 news_summary = " | ".join([n["title"] for n in news_list])
 
@@ -169,26 +163,33 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
             "news": news_list
         }
         
-        # 🔥 4. 真實 AI 介入點 (Harness Engineering 執行)
+        # 🔥 啟動 DCF 計算 (在背景執行，不卡畫面)
+        dcf_task = asyncio.to_thread(dcf_engine.calculate, symbol, market)
+
+        # 🔥 等待 DCF 算完並加入結果
+        try:
+            result["dcf_valuation"] = await dcf_task
+        except Exception as e:
+            result["dcf_valuation"] = {"error": f"DCF 失敗: {str(e)}"}
+
+        # 🔥 真實 AI 介入點
         if ai_report: 
-            # 準備餵給 AI 的乾淨數據
             ticker_data = {
                 "symbol": ticker_symbol,
-                "roe": quality["breakdown"]["roe"]["value"],
-                "pe": valuation["breakdown"]["pe_ratio"]["value"],
-                "debt_to_equity": quality["breakdown"]["debt_to_equity"]["value"]
+                "roe": quality["breakdown"].get("roe", {}).get("value", "N/A"),
+                "pe": valuation["breakdown"].get("pe_ratio", {}).get("value", "N/A"),
+                "debt_to_equity": quality["breakdown"].get("debt_to_equity", {}).get("value", "N/A")
             }
-            
-            # 呼叫 Gemini
             raw_ai_response = await analyst.generate_report(ticker_data, news_summary)
-            
-            # 將 Gemini 吐出來的 JSON 字串轉換為 Python 字典
             try:
                 result["ai_report"] = json.loads(raw_ai_response)
             except json.JSONDecodeError:
                 result["ai_report"] = {"error": "AI 返回格式解析失敗", "raw_output": raw_ai_response}
 
         return result
+
+    except Exception as e:
+        return {"error": f"API 發生錯誤: {str(e)}"}
 
     except Exception as e:
         return {"error": f"API Blocked by Yahoo Finance: {str(e)}"}

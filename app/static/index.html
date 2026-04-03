@@ -406,7 +406,11 @@
       <div class="chart-container">
         <canvas id="priceChart"></canvas>
       </div>
-
+      <h2>Dimension 7: DCF Intrinsic Valuation</h2>
+      <div id="dcfBox"
+        style="background: #1a1a2e; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #00e676;">
+        <div id="dcfContent">Calculating intrinsic value...</div>
+      </div>
       <h2>Dimensions 3 & 4: Fundamentals & Valuation</h2>
       <div class="metric-grid" id="metricsGrid"></div>
 
@@ -475,6 +479,34 @@
         }
 
         renderChart(data.chart_data);
+        // --- 渲染 DCF 結果 ---
+        const dcfContent = document.getElementById('dcfContent');
+        if (data.dcf_valuation && !data.dcf_valuation.error) {
+          const dcf = data.dcf_valuation;
+          const isUndervalued = parseFloat(dcf.upside) > 0;
+          const color = isUndervalued ? '#00e676' : '#ff5252';
+
+          dcfContent.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <p style="color:#888; font-size:13px; margin-bottom: 4px;">Intrinsic Value (Target)</p>
+                <h3 style="font-size:32px; color: ${color};">${dcf.currency} ${dcf.target_price}</h3>
+            </div>
+            <div style="text-align: right;">
+                <p style="color:#888; font-size:13px; margin-bottom: 4px;">Upside / Downside</p>
+                <h3 style="font-size:24px; color: ${color};">${dcf.upside}</h3>
+                <p style="font-size:14px; font-weight: bold; color: ${color}; margin-top: 4px;">${dcf.verdict}</p>
+            </div>
+        </div>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display: flex; gap: 20px; font-size: 13px; color: #aaa;">
+            <span><strong>WACC:</strong> ${dcf.wacc_detail.wacc}</span>
+            <span><strong>Terminal Growth:</strong> ${dcf.assumptions.terminal_growth}</span>
+            <span><strong>Base FCF:</strong> ${dcf.fcf_history.base_used}</span>
+        </div>
+    `;
+        } else {
+          dcfContent.innerHTML = `<p style="color:#ffab00;">DCF Model Unavailable: ${data.dcf_valuation?.error || 'Insufficient fundamental data for this stock.'}</p>`;
+        }
 
         document.getElementById('resultCard').classList.add('visible');
       } catch (e) {

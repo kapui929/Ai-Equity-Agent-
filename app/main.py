@@ -215,8 +215,13 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
     dcf_task = asyncio.to_thread(dcf_engine.calculate, symbol, market)
 
     if ai_report:
-        # 準備餵給 AI 的數據
-        ticker_data = {"symbol": ticker_symbol, "roe": roe, "pe": pe, "debt_to_equity": de}
+      # 準備餵給 AI 的數據
+        ticker_data = {
+            "symbol": ticker_symbol,
+            "roe": quality.get("breakdown", {}).get("roe", {}).get("value", "N/A"),
+            "pe": valuation.get("breakdown", {}).get("pe_ratio", {}).get("value", "N/A"),
+            "debt_to_equity": quality.get("breakdown", {}).get("debt_to_equity", {}).get("value", "N/A")
+        }
         ai_task = analyst.generate_report(ticker_data, news_summary)
 
     # 等待兩邊同時算完

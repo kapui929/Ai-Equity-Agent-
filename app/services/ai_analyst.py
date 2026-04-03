@@ -18,7 +18,7 @@ class AIAnalyst:
             base_url="https://integrate.api.nvidia.com/v1",
             api_key=api_key
         )
-        self.model_name = "deepseek-ai/deepseek-v3"
+        self.model_name = "deepseek-ai/deepseek-v3.2"
 
     async def generate_report(self, ticker_data, news_summary):
         """

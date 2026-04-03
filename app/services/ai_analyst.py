@@ -18,7 +18,7 @@ class AIAnalyst:
             base_url="https://integrate.api.nvidia.com/v1",
             api_key=api_key
         )
-        self.model_name = "z-ai/glm4.7"
+        self.model_name = "deepseek-ai/deepseek-v3"
 
     async def generate_report(self, ticker_data, news_summary):
         """
@@ -31,6 +31,7 @@ class AIAnalyst:
         
         prompt = f"""
         # Role: Senior Equity Research Analyst (CFA Track)
+        # Task: Execute the Decision Pipeline (Harness Engineering)
         
         # Input Data:
         - Ticker: {symbol}

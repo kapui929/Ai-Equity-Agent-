@@ -192,3 +192,41 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
 
     except Exception as e:
         return {"error": f"API Blocked by Yahoo Finance: {str(e)}"}
+import asyncio
+from app.services.dcf_model import DCFModel
+
+# 初始化你的 DCF 模型
+dcf_engine = DCFModel()
+
+@app.get("/analyze")
+async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool = Query(False)):
+    # ... 前面抓取 tk.history 等基本數據的邏輯保持不變 ...
+    
+    result = {
+        # ... 原本的 quality, valuation, chart_data ...
+    }
+
+    # 🔥 關鍵：同時啟動「DCF 計算」與「AI 分析」
+    dcf_task = None
+    ai_task = None
+
+    # 啟動 DCF 背景運算 (使用 to_thread 避免卡死伺服器)
+    dcf_task = asyncio.to_thread(dcf_engine.calculate, symbol, market)
+
+    if ai_report:
+        # 準備餵給 AI 的數據
+        ticker_data = {"symbol": ticker_symbol, "roe": roe, "pe": pe, "debt_to_equity": de}
+        ai_task = analyst.generate_report(ticker_data, news_summary)
+
+    # 等待兩邊同時算完
+    if dcf_task:
+        result["dcf_valuation"] = await dcf_task
+        
+    if ai_task:
+        raw_ai_response = await ai_task
+        try:
+            result["ai_report"] = json.loads(raw_ai_response)
+        except:
+            result["ai_report"] = {"error": "解析失敗"}
+
+    return result

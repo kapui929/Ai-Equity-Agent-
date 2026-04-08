@@ -1,6 +1,7 @@
 import asyncio
 import json
 import yfinance as yf
+import requests_cache  # 🔥 1. 新增這行：匯入快取模組
 from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -8,6 +9,10 @@ from fastapi.responses import FileResponse
 # 導入 AI 與 DCF 服務
 from app.services.ai_analyst import AIAnalyst
 from app.services.dcf_model import DCFModel
+
+# 🔥 2. 新增這兩行：建立一個偽裝成 Chrome 瀏覽器的 Session，避免被 Yahoo 封鎖
+session = requests_cache.CachedSession('yfinance.cache')
+session.headers['User-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -104,12 +109,13 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
     else: ticker_symbol = symbol.upper()
 
     try:
-        tk = yf.Ticker(ticker_symbol)
+        # 🔥 3. 修改這行：將 session 傳入 Ticker，啟用偽裝與快取
+        tk = yf.Ticker(ticker_symbol, session=session)
         
-       # 1. 抓取圖表數據
+        # 抓取圖表數據
         hist = tk.history(period="1y")
         
-        # 🔥 新增這行：過濾掉 Yahoo Finance 傳回來的空值 (NaN) 行，防止 JSON 崩潰
+        # 過濾掉 Yahoo Finance 傳回來的空值 (NaN) 行，防止 JSON 崩潰
         hist = hist.dropna(subset=['Close'])
         
         if hist.empty:
@@ -122,7 +128,7 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
         currency_map = {"HK": "HKD", "TW": "TWD", "US": "USD", "CRYPTO": "USD"}
         display_currency = currency_map.get(market, "USD")
 
-        # 2. 抓取基本面數據
+        # 抓取基本面數據
         try:
             info = tk.info
             quality = score_quality(info)
@@ -137,7 +143,7 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
             name = f"{ticker_symbol} (Live Chart, API Limited)"
             sector = "N/A"
 
-        # 3. 抓取新聞
+        # 抓取新聞
         raw_news = tk.news
         news_list = []
         news_summary = "暫無新聞"
@@ -167,7 +173,7 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
         }
         
         # ==========================================
-        # 🔥 4. 同步啟動 DCF 計算與 AI 分析 (背景並行處理不卡畫面)
+        # 同步啟動 DCF 計算與 AI 分析 (背景並行處理不卡畫面)
         # ==========================================
         dcf_task = asyncio.to_thread(dcf_engine.calculate, symbol, market)
         ai_task = None

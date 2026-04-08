@@ -1,5 +1,10 @@
 import yfinance as yf
 import numpy as np
+import requests_cache # 🔥 1. 匯入快取模組
+
+# 🔥 2. 建立偽裝成 Chrome 瀏覽器的 Session，避免被 Yahoo 封鎖
+session = requests_cache.CachedSession('yfinance.cache')
+session.headers['User-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
 class DCFModel:
     MARKET_PARAMS = {
@@ -15,15 +20,20 @@ class DCFModel:
             mkt = market.upper()
             p = self.MARKET_PARAMS.get(mkt, self.MARKET_PARAMS["US"])
             sfx = self.SUFFIXES.get(mkt, "")
-            stock = yf.Ticker(f"{symbol}{sfx}")
+            
+            # 🔥 3. 將 session 傳入 Ticker，啟用偽裝與快取
+            stock = yf.Ticker(f"{symbol}{sfx}", session=session)
+            
             info = stock.info
             price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
             shares = info.get("sharesOutstanding") or 0
             if not price or not shares:
                 return {"error": "No price/shares data"}
+                
             fcf, fcf_hist = self._get_fcf(stock, info)
             if not fcf or fcf <= 0:
                 return {"error": "No positive FCF"}
+                
             beta = info.get("beta") or 1.0
             beta = max(0.5, min(beta, 1.8))
             ke = p["rf"] + beta * p["erp"]
@@ -35,7 +45,8 @@ class DCFModel:
                 wacc = we * ke + wd * 0.05 * (1 - p["tax"])
             else:
                 wacc = ke; wd = 0; we = 1
-            wacc = max(0.06, min(wacc, 0.25))
+                
+            wacc = max(0.06, min(wacc, 0.12))
             signals = []
             pos = [h for h in fcf_hist if h["fcf"] > 0]
             if len(pos) >= 3:
@@ -48,6 +59,7 @@ class DCFModel:
                     med = max(-0.20, min(med, 0.25))
                     w = 1.2 if med > 0 else 0.3
                     signals.append(("FCF CAGR (median)", med, w))
+                    
             rg = info.get("revenueGrowth")
             if rg and -0.5 < rg < 1.0:
                 signals.append(("Revenue Growth", rg, 1.0))
@@ -60,6 +72,7 @@ class DCFModel:
                 sg = roe * (1 - pay)
                 if 0 < sg < 0.35:
                     signals.append(("Sustainable Growth", sg, 0.7))
+                    
             try:
                 fins = stock.financials
                 if fins is not None and not fins.empty:
@@ -80,6 +93,7 @@ class DCFModel:
                             rc = max(-0.10, min(rc, 0.25))
                             signals.append(("Revenue CAGR (hist)", rc, 1.0))
             except: pass
+            
             # Buyback signal for mature companies
             bb = info.get("sharesPercentSharesOut")
             if not bb:
@@ -99,6 +113,7 @@ class DCFModel:
                                         signals.append(("Buyback Yield", min(bb_rate, 0.06), 0.5))
                                 break
                 except: pass
+                
             if signals:
                 tw = sum(s[2] for s in signals)
                 g_high = sum(s[1] * s[2] for s in signals) / tw
@@ -108,6 +123,7 @@ class DCFModel:
                     g_high = min(g_high, med_s * 1.5)
             else:
                 g_high = 0.05
+                
             # Buyback boost: if company buys back shares, per-share value grows faster
             bb_boost = 0
             try:
@@ -130,6 +146,7 @@ class DCFModel:
                                         signals.append(("Buyback Yield", bb_boost, 0.8))
                             break
             except: pass
+            
             if signals:
                 tw = sum(s[2] for s in signals)
                 g_high = sum(s[1] * s[2] for s in signals) / tw
@@ -139,19 +156,32 @@ class DCFModel:
                     g_high = min(g_high, med_s * 1.5)
             else:
                 g_high = 0.05
-            g_high = max(0.03, min(g_high, 0.20))
+                
+            # 1. 設定成長率天花板 (最小 3%，最大 35%)
+            g_high = max(0.03, min(g_high, 0.35))
+            
             tg = min(p["tg"], wacc - 0.015)
             tg = max(0.02, tg)
+            
+            # 2. 現金流平滑處理區塊
             if len(pos) >= 3:
-                avg_f = np.mean([h["fcf"] for h in pos])
-                if fcf > avg_f * 1.5:
+                avg_f = np.mean([h["fcf"] for h in pos]) 
+                
+                # 如果最新 FCF 超過平均值的 3 倍，才進行平滑懲罰
+                if fcf > avg_f * 3.0:
                     fcf_base = (fcf + avg_f) / 2
-                    fcf_note = f"Blended (latest too high vs avg)"
+                    fcf_note = "Blended (latest extreme outlier)"
                 else:
-                    fcf_base = fcf; fcf_note = "Using latest FCF"
+                    fcf_base = fcf
+                    fcf_note = "Using latest FCF"
             else:
-                fcf_base = fcf; fcf_note = "Limited history"
-            projs = []; pv_sum = 0; f = fcf_base
+                # 歷史數據不足 3 年時的處理
+                fcf_base = fcf
+                fcf_note = "Limited history"
+
+            projs = []
+            pv_sum = 0
+            f = fcf_base
             for yr in range(1, 11):
                 if yr <= 5: g = g_high
                 else:
@@ -161,6 +191,7 @@ class DCFModel:
                 df = 1 / ((1 + wacc) ** yr)
                 pv = f * df; pv_sum += pv
                 projs.append({"year": yr, "fcf": round(f), "growth": round(g*100, 1), "pv": round(pv)})
+                
             last_f = projs[-1]["fcf"]
             tv = last_f * (1 + tg) / (wacc - tg)
             pv_tv = tv / ((1 + wacc) ** 10)
@@ -168,14 +199,17 @@ class DCFModel:
             ev = pv_sum + pv_tv
             eq = ev + cash - total_debt
             target = eq / shares if shares > 0 else 0
+            
             if target <= 0:
                 return {"error": "Negative DCF value"}
+                
             upside = ((target - price) / price) * 100
             if upside > 30: verdict = "Strongly Undervalued"
             elif upside > 10: verdict = "Undervalued"
             elif upside > -10: verdict = "Fairly Valued"
             elif upside > -30: verdict = "Overvalued"
             else: verdict = "Strongly Overvalued"
+            
             cs = {"HKD":"HK$","TWD":"NT$","USD":"$"}.get(info.get("currency","USD"), "$")
             sens = []
             for dw in [-0.02, -0.01, 0, 0.01, 0.02]:
@@ -189,6 +223,7 @@ class DCFModel:
                     eq2 = pv_sum + pv2 + cash - total_debt
                     row[f"g={g2*100:.1f}%"] = round(eq2 / shares)
                 sens.append(row)
+                
             gd = [{"signal": s[0], "value": f"{s[1]*100:.1f}%", "weight": s[2]} for s in signals]
             return {
                 "current_price": round(price, 2), "target_price": round(target, 2),
@@ -240,6 +275,7 @@ class DCFModel:
                                     capex = abs(float(cv))
                             hist.append({"year": yr, "fcf": round(val - capex)})
         except: pass
+        
         hist = sorted(hist, key=lambda x: x["year"])
         if hist:
             pos_fcfs = [h["fcf"] for h in hist if h["fcf"] > 0]
@@ -250,6 +286,7 @@ class DCFModel:
                 if latest <= 0 or latest < median_fcf * 0.5:
                     return round(median_fcf), hist
                 return latest, hist
+                
         fi = info.get("freeCashflow")
         if fi and fi > 0: return fi, [{"year": "TTM", "fcf": fi}]
         ocf = info.get("operatingCashflow") or 0

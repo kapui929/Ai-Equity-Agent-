@@ -7,18 +7,19 @@ load_dotenv()
 
 class AIAnalyst:
     def __init__(self):
-        # 1. 密鑰管理：從環境變數讀取
-        api_key = os.getenv("NVIDIA_API_KEY")
+        # 1. 密鑰管理：改為讀取 DEEPSEEK_API_KEY
+        api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
-            raise ValueError("在 .env 檔案中找不到 NVIDIA_API_KEY，請確認是否設定正確。")
+            raise ValueError("在 .env 檔案中找不到 DEEPSEEK_API_KEY，請確認是否設定正確。")
         
-        # 2. 初始化客戶端
+        # 2. 初始化客戶端：使用 DeepSeek 官方節點
         self.client = AsyncOpenAI(
-            base_url="https://integrate.api.nvidia.com/v1",
+            base_url="https://api.deepseek.com",
             api_key=api_key
         )
-        # 根據之前官網截圖，這裡使用 v3.2
-        self.model_name = "deepseek-ai/deepseek-v3.2"
+        
+        # 3. 設定模型名稱：使用官方 V3 模型名稱 'deepseek-chat'
+        self.model_name = "deepseek-chat"
 
     async def generate_report(self, ticker_data, news_summary):
         """
@@ -58,15 +59,13 @@ class AIAnalyst:
         """
         
         try:
-            # 🚀 這裡修正了縮排並優化參數
+            # 🚀 調用 DeepSeek 原生接口
             response = await self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2, 
-                max_tokens=2048, # 限制長度提速
-                extra_body={
-                    "chat_template_kwargs": {"thinking": False} # 👈 強制跳過思考過程
-                }
+                max_tokens=2048
+                # 已經移除 NVIDIA 特有的 extra_body 參數
             )
             
             raw_content = response.choices[0].message.content
@@ -80,4 +79,4 @@ class AIAnalyst:
             return raw_content
             
         except Exception as e:
-            return f'{{"error": "NVIDIA API 推理過程中發生錯誤: {str(e)}"}}'
+            return f'{{"error": "DeepSeek API 推理過程中發生錯誤: {str(e)}"}}'

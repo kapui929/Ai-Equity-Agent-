@@ -1,31 +1,27 @@
+import asyncio
+import json
+import yfinance as yf
 from fastapi import FastAPI, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-import yfinance as yf
-import json
 
-# 🔥 1. 導入我們剛寫好的真 AI 大腦
+# 導入 AI 與 DCF 服務
 from app.services.ai_analyst import AIAnalyst
-from app.services.dcf_model import DCFModel # 👈 新增這個
+from app.services.dcf_model import DCFModel
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+# 初始化服務
 analyst = AIAnalyst()
-dcf_engine = DCFModel() # 👈 初始化 DCF 模型
-
-app = FastAPI()
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-
-# 🔥 2. 初始化 AI 分析師
-analyst = AIAnalyst()
+dcf_engine = DCFModel()
 
 @app.get("/")
 def index():
     return FileResponse("app/static/index.html")
 
 # ==========================================
-# 保留你的打分邏輯 (這部分負責驅動前端的 UI 面板)
+# 評分邏輯函數 (負責驅動前端的 UI 面板)
 # ==========================================
 def score_quality(info):
     breakdown, total = {}, 0
@@ -97,7 +93,9 @@ def score_valuation(info):
 
     return {"score": min(total, 100), "breakdown": breakdown}
 
-# 🔥 3. 注意這裡加上了 async，因為呼叫 LLM 是一個需要等待的 I/O 動作
+# ==========================================
+# 主 API 端點 (已整合併行處理 DCF 與 AI)
+# ==========================================
 @app.get("/analyze")
 async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool = Query(False)):
     if market == "TW": ticker_symbol = f"{symbol}.TW"
@@ -108,7 +106,7 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
     try:
         tk = yf.Ticker(ticker_symbol)
         
-        # 抓取圖表數據
+        # 1. 抓取圖表數據
         hist = tk.history(period="1y")
         if hist.empty:
             return {"error": f"Cannot find any data for {ticker_symbol}"}
@@ -120,7 +118,7 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
         currency_map = {"HK": "HKD", "TW": "TWD", "US": "USD", "CRYPTO": "USD"}
         display_currency = currency_map.get(market, "USD")
 
-        # 抓取基本面數據
+        # 2. 抓取基本面數據
         try:
             info = tk.info
             quality = score_quality(info)
@@ -135,7 +133,7 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
             name = f"{ticker_symbol} (Live Chart, API Limited)"
             sector = "N/A"
 
-        # 抓取新聞
+        # 3. 抓取新聞
         raw_news = tk.news
         news_list = []
         news_summary = "暫無新聞"
@@ -150,6 +148,7 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
             if news_list:
                 news_summary = " | ".join([n["title"] for n in news_list])
 
+        # 準備基礎返回結果
         result = {
             "symbol": ticker_symbol,
             "name": name,
@@ -163,24 +162,30 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
             "news": news_list
         }
         
-        # 🔥 啟動 DCF 計算 (在背景執行，不卡畫面)
+        # ==========================================
+        # 🔥 4. 同步啟動 DCF 計算與 AI 分析 (背景並行處理不卡畫面)
+        # ==========================================
         dcf_task = asyncio.to_thread(dcf_engine.calculate, symbol, market)
+        ai_task = None
 
-        # 🔥 等待 DCF 算完並加入結果
+        if ai_report: 
+            ticker_data = {
+                "symbol": ticker_symbol,
+                "roe": quality.get("breakdown", {}).get("roe", {}).get("value", "N/A"),
+                "pe": valuation.get("breakdown", {}).get("pe_ratio", {}).get("value", "N/A"),
+                "debt_to_equity": quality.get("breakdown", {}).get("debt_to_equity", {}).get("value", "N/A")
+            }
+            ai_task = analyst.generate_report(ticker_data, news_summary)
+
+        # 等待 DCF 任務完成
         try:
             result["dcf_valuation"] = await dcf_task
         except Exception as e:
             result["dcf_valuation"] = {"error": f"DCF 失敗: {str(e)}"}
 
-        # 🔥 真實 AI 介入點
-        if ai_report: 
-            ticker_data = {
-                "symbol": ticker_symbol,
-                "roe": quality["breakdown"].get("roe", {}).get("value", "N/A"),
-                "pe": valuation["breakdown"].get("pe_ratio", {}).get("value", "N/A"),
-                "debt_to_equity": quality["breakdown"].get("debt_to_equity", {}).get("value", "N/A")
-            }
-            raw_ai_response = await analyst.generate_report(ticker_data, news_summary)
+        # 等待 AI 任務完成 (如果有觸發)
+        if ai_task:
+            raw_ai_response = await ai_task
             try:
                 result["ai_report"] = json.loads(raw_ai_response)
             except json.JSONDecodeError:
@@ -190,49 +195,3 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
 
     except Exception as e:
         return {"error": f"API 發生錯誤: {str(e)}"}
-
-    except Exception as e:
-        return {"error": f"API Blocked by Yahoo Finance: {str(e)}"}
-import asyncio
-from app.services.dcf_model import DCFModel
-
-# 初始化你的 DCF 模型
-dcf_engine = DCFModel()
-
-@app.get("/analyze")
-async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report: bool = Query(False)):
-    # ... 前面抓取 tk.history 等基本數據的邏輯保持不變 ...
-    
-    result = {
-        # ... 原本的 quality, valuation, chart_data ...
-    }
-
-    # 🔥 關鍵：同時啟動「DCF 計算」與「AI 分析」
-    dcf_task = None
-    ai_task = None
-
-    # 啟動 DCF 背景運算 (使用 to_thread 避免卡死伺服器)
-    dcf_task = asyncio.to_thread(dcf_engine.calculate, symbol, market)
-
-    if ai_report:
-      # 準備餵給 AI 的數據
-        ticker_data = {
-            "symbol": ticker_symbol,
-            "roe": quality.get("breakdown", {}).get("roe", {}).get("value", "N/A"),
-            "pe": valuation.get("breakdown", {}).get("pe_ratio", {}).get("value", "N/A"),
-            "debt_to_equity": quality.get("breakdown", {}).get("debt_to_equity", {}).get("value", "N/A")
-        }
-        ai_task = analyst.generate_report(ticker_data, news_summary)
-
-    # 等待兩邊同時算完
-    if dcf_task:
-        result["dcf_valuation"] = await dcf_task
-        
-    if ai_task:
-        raw_ai_response = await ai_task
-        try:
-            result["ai_report"] = json.loads(raw_ai_response)
-        except:
-            result["ai_report"] = {"error": "解析失敗"}
-
-    return result

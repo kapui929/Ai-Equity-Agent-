@@ -106,8 +106,12 @@ async def analyze(symbol: str = Query(...), market: str = Query("US"), ai_report
     try:
         tk = yf.Ticker(ticker_symbol)
         
-        # 1. 抓取圖表數據
+       # 1. 抓取圖表數據
         hist = tk.history(period="1y")
+        
+        # 🔥 新增這行：過濾掉 Yahoo Finance 傳回來的空值 (NaN) 行，防止 JSON 崩潰
+        hist = hist.dropna(subset=['Close'])
+        
         if hist.empty:
             return {"error": f"Cannot find any data for {ticker_symbol}"}
             

@@ -1,10 +1,5 @@
 import yfinance as yf
 import numpy as np
-import requests_cache # 🔥 1. 匯入快取模組
-
-# 🔥 2. 建立偽裝成 Chrome 瀏覽器的 Session，避免被 Yahoo 封鎖
-session = requests_cache.CachedSession('yfinance.cache')
-session.headers['User-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
 class DCFModel:
     MARKET_PARAMS = {
@@ -21,8 +16,8 @@ class DCFModel:
             p = self.MARKET_PARAMS.get(mkt, self.MARKET_PARAMS["US"])
             sfx = self.SUFFIXES.get(mkt, "")
             
-            # 🔥 3. 將 session 傳入 Ticker，啟用偽裝與快取
-            stock = yf.Ticker(f"{symbol}{sfx}", session=session)
+            # 🔥 已經拿掉 session，讓 yfinance 原生的反阻擋機制自己接管
+            stock = yf.Ticker(f"{symbol}{sfx}")
             
             info = stock.info
             price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
